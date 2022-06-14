@@ -59,6 +59,7 @@ exports.make = function(filename, colors, callback) {
 
             //Parse RGB
             var rgb = color.hexToRgb(hex);
+
             rgb = rgb.filter(function(value) {
                 return !isNaN(value);
             });
@@ -89,6 +90,7 @@ exports.make = function(filename, colors, callback) {
             writeZero(aco);
         });
     } catch (e) {
+        console.log(e);
         var error = "Parse Error";
         if (e === colorException) {
             error = "Invalid Color";
@@ -107,3 +109,111 @@ exports.make = function(filename, colors, callback) {
         callback(null, aco);
     }
 };
+
+exports.read = function(filename, callback) {
+    var pointer = 0, read = 0;
+    var buffer = Buffer.alloc(0);
+    var version;
+    var colors = [];
+    var aco = fs.createReadStream(filename);
+
+    aco.on('readable', onReadable);
+
+    function onReadable() {
+        var chunk = aco.read();
+
+        if(chunk === null) {
+            buffer = undefined;
+            colors = colors.filter(function(value) {
+                return value !== undefined;
+            });
+            callback(null, colors);
+            return;
+        }
+
+        read += chunk.length;
+
+        var data = Buffer.concat([buffer, chunk]);
+        var { length } = data;
+
+        if(version === undefined) {
+            version = readValue(data.subarray(pointer, pointer + 2));
+            pointer += 2;
+        }
+        
+        if(version === 1 || version === 2) {
+            parsePartialACO(data, length);
+        } else {
+            aco.destroy();
+            var error = "Parse Error";
+
+            if (callback && 'function' === typeof callback) {
+                callback(error);
+            } else {
+                throw new Error(error);
+            }
+        }
+    }
+
+    function parsePartialACO(data, length) {
+        if(pointer === 2 && length >= pointer + 2) {
+            colors.length = readValue(data.subarray(pointer, pointer + 2));
+            pointer += 2;
+        }
+        
+        var colorHeaderLength = version === 2 ? 14 : 10;
+        var hasTailV2 = version === 1 && colors.length && length > pointer + (colorHeaderLength * colors.length) && readValue(data.subarray(pointer + (colorHeaderLength * colors.length), pointer + (colorHeaderLength * colors.length) + 2)) === 2;
+
+        if(hasTailV2) {
+            version = 2;
+            colorHeaderLength = 14;
+            data = data.subarray(4 + (10 * colors.length));
+        }
+
+        if(pointer >= 4) {
+            for(var i = 0; i < colors.length; i++) {
+                if(colors[i] !== undefined) { continue };
+
+                var colorHeaderData = data.subarray(pointer, pointer + colorHeaderLength);
+                if(colorHeaderData.length !== colorHeaderLength) { break; }
+
+                var name = "";
+
+                if(version === 2) {
+                    var nameLength = readValue(colorHeaderData.subarray(colorHeaderLength - 2, colorHeaderLength));
+                    nameLength--;
+
+                    var colorNameData = data.subarray(pointer + colorHeaderLength, pointer + colorHeaderLength + (nameLength * 2));
+                    if(colorNameData.length !== (nameLength * 2)) { break; }
+
+                    pointer += colorHeaderLength + (nameLength * 2) + 2;
+
+                    for(var n = 0; n < nameLength * 2; n += 2) {
+                        name += readCharValue(colorNameData.subarray(n, n + 2));
+                    }
+                } else {
+                    pointer += colorHeaderLength;
+                }
+
+                var colorspace = readValue(colorHeaderData.subarray(0, 2));
+                if(colorspace !== 0) {
+                    console.log("Non RGB color (colorspace " + colorspace + ") skipped\n");
+                    continue;
+                }
+
+                var r = readRGBValue(colorHeaderData.subarray(2, 4));
+                var g = readRGBValue(colorHeaderData.subarray(4, 6));
+                var b = readRGBValue(colorHeaderData.subarray(6, 8));
+
+                colors[i] = {
+                    color: color.rgbToHex([Math.floor(r), Math.floor(g), Math.floor(b)]),
+                    name,
+                };
+            }
+        }
+
+        if(pointer < read) {
+            buffer = data.subarray(pointer);
+        }
+    }
+}
