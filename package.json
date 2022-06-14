@@ -1,7 +1,7 @@
 {
   "name": "node-aco",
   "description": "make Adobe Color files",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "aco.js",
   "maintainers": [
     {
