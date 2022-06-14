@@ -110,6 +110,7 @@ exports.make = function(filename, colors, callback) {
     }
 };
 
+// https://medium.com/swlh/mastering-adobe-color-file-formats-d29e43fde8eb#:~:text=For%20this%20purpose%2C%20Adobe%20offers,ACT%20(Adobe%20Color%20Table).
 exports.read = function(filename, callback) {
     var pointer = 0, read = 0;
     var buffer = Buffer.alloc(0);
