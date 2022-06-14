@@ -2,6 +2,7 @@
   "name": "node-aco",
   "description": "make Adobe Color files",
   "version": "0.1",
+  "main": "aco.js",
   "maintainers": [
     {
       "name": "David LeMieux",
