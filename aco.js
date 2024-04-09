@@ -5,7 +5,7 @@ var colorException = {};
 
 //ACO files take 16 bit words.
 function writeValue(writeStream, value) {
-    var buffer = new Buffer(2);
+    var buffer = Buffer.alloc(2);
     buffer.writeUInt16BE(value, 0);
     writeStream.write(buffer);
 }
